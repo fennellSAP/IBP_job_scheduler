@@ -532,7 +532,7 @@ public class Sched {
 			String vJobName = jobName_runCount[0];
 			String vJobRunCount = jobName_runCount[1];
 			
-			char vJobState = 'Z';
+			char vJobState;
 			
 			// While job is not finished, cancelled or scheduled check on the status
 			do {
