@@ -15,6 +15,80 @@ import java.util.concurrent.TimeUnit;
 
 public class Sched {
 	
+	public static void main(String[] args) {
+
+		System.out.println("Starting..."); 
+		
+		// Job/Template Info
+		String vBaseURL      = "https://pt6-001-api.wdf.sap.corp/sap/opu/odata/sap/BC_EXT_APPJOB_MANAGEMENT;v=0002";   
+		String vUserPassword = "ODATA_USER_TEST:Welcome1!";   
+		String vTemplateName = "ZESFAPPKASAPORGUBONUIUOSE4E";   
+		String vTemplateText = "Scheduled via Java";   
+		String vExecuteUser  = "CB8980002901";
+		
+		// URLs to use to call API
+		String vGetTemplates     = "/JobTemplateSet?";   
+		String vScheduleTemplate = "/JobSchedule?JobTemplateName='" + vTemplateName + "'&JobText='TestingJob'&JobUser='" + vExecuteUser + "'";   
+		String vGetStatus        = "/JobStatusGet?JobName='";
+		
+		try {
+			
+			// Create URL to schedule job
+			vScheduleTemplate = encodeURL(vScheduleTemplate, vTemplateName, vTemplateText, vExecuteUser);
+			
+			// Init request to get templates
+			HttpsURLConnection oConnection = createGetTemplateRequest(vUserPassword, vBaseURL, vGetTemplates);
+			
+			// Read the template get response
+			String vTemplateList = readTemplateResponse(oConnection);
+			
+			// Print template response and save cookie and CSRF Token
+			String[] cookie_CSRF = printTemplateResponse(oConnection, vTemplateList);
+			String vCookie = cookie_CSRF[0];
+			String vCSRFToken = cookie_CSRF[1];
+			
+			// Init POST request to schedule job
+			HttpsURLConnection oConnectionPOST = createSchedulePostRequest(vBaseURL, vScheduleTemplate, vCookie, vCSRFToken);
+		
+			// Read the POST request response to schedule job
+			String vResponse = printSchedulePostResponse(oConnectionPOST);
+			
+			// Get job name and job run count
+			String[] jobName_runCount = getJobName_RunCount(oConnectionPOST, vResponse);
+			String vJobName = jobName_runCount[0];
+			String vJobRunCount = jobName_runCount[1];
+			
+			char vJobState;
+			
+			// While job is not finished, cancelled or scheduled check on the status
+			do {
+				// Init GET request to check status of job
+				HttpsURLConnection oConnectionStatus = createGetStatusRequest(vJobName, vJobRunCount, vGetStatus, vTemplateName, vBaseURL, vCookie, vCSRFToken);
+				
+				// Read GET request to check status of job
+				String vJobStatus = readGetStatusResponse(oConnectionStatus, vTemplateList);
+				
+				// Output get status response
+				vJobState = printGetStatusResponse(oConnectionStatus, vJobStatus);
+				
+				// Wait 1 second before checking to limit requests
+				try {
+				    Thread.sleep(1000);
+				}
+				catch(InterruptedException ex) {
+					
+				    Thread.currentThread().interrupt();
+				}
+			}
+			while(vJobState == 'R' || vJobState == 'Y' || vJobState == 'S');
+		
+		// Handle Errors
+		} catch (java.net.MalformedURLException e) {
+			e.printStackTrace();
+		} catch (java.io.IOException e) {
+			e.printStackTrace();
+		}
+	}
 	
 	// Function to encode URL to schedule a job
 	private static String encodeURL(String vScheduleTemplate, String vTemplateName, String vTemplateText, String vExecuteUser) {
@@ -485,82 +559,6 @@ public class Sched {
 		} else {
 			
 			return 'A';
-		}
-	}
-		
-	
-	public static void main(String[] args) {
-
-		System.out.println("Starting..."); 
-		
-		// Job/Template Info
-		String vBaseURL      = "https://pt6-001-api.wdf.sap.corp/sap/opu/odata/sap/BC_EXT_APPJOB_MANAGEMENT;v=0002";   
-		String vUserPassword = "ODATA_USER_TEST:Welcome1!";   
-		String vTemplateName = "ZESFAPPKASAPORGUBONUIUOSE4E";   
-		String vTemplateText = "Scheduled via Java";   
-		String vExecuteUser  = "CB8980002901";
-		
-		// URLs to use to call API
-		String vGetTemplates     = "/JobTemplateSet?";   
-		String vScheduleTemplate = "/JobSchedule?JobTemplateName='" + vTemplateName + "'&JobText='TestingJob'&JobUser='" + vExecuteUser + "'";   
-		String vGetStatus        = "/JobStatusGet?JobName='";
-		
-		try {
-			
-			// Create URL to schedule job
-			vScheduleTemplate = encodeURL(vScheduleTemplate, vTemplateName, vTemplateText, vExecuteUser);
-			
-			// Init request to get templates
-			HttpsURLConnection oConnection = createGetTemplateRequest(vUserPassword, vBaseURL, vGetTemplates);
-			
-			// Read the template get response
-			String vTemplateList = readTemplateResponse(oConnection);
-			
-			// Print template response and save cookie and CSRF Token
-			String[] cookie_CSRF = printTemplateResponse(oConnection, vTemplateList);
-			String vCookie = cookie_CSRF[0];
-			String vCSRFToken = cookie_CSRF[1];
-			
-			// Init POST request to schedule job
-			HttpsURLConnection oConnectionPOST = createSchedulePostRequest(vBaseURL, vScheduleTemplate, vCookie, vCSRFToken);
-		
-			// Read the POST request response to schedule job
-			String vResponse = printSchedulePostResponse(oConnectionPOST);
-			
-			// Get job name and job run count
-			String[] jobName_runCount = getJobName_RunCount(oConnectionPOST, vResponse);
-			String vJobName = jobName_runCount[0];
-			String vJobRunCount = jobName_runCount[1];
-			
-			char vJobState;
-			
-			// While job is not finished, cancelled or scheduled check on the status
-			do {
-				// Init GET request to check status of job
-				HttpsURLConnection oConnectionStatus = createGetStatusRequest(vJobName, vJobRunCount, vGetStatus, vTemplateName, vBaseURL, vCookie, vCSRFToken);
-				
-				// Read GET request to check status of job
-				String vJobStatus = readGetStatusResponse(oConnectionStatus, vTemplateList);
-				
-				// Output get status response
-				vJobState = printGetStatusResponse(oConnectionStatus, vJobStatus);
-				
-				// Wait 1 second before checking to limit requests
-				try {
-				    Thread.sleep(1000);
-				}
-				catch(InterruptedException ex) {
-					
-				    Thread.currentThread().interrupt();
-				}
-			}
-			while(vJobState == 'R' || vJobState == 'Y' || vJobState == 'S');
-		
-		// Handle Errors
-		} catch (java.net.MalformedURLException e) {
-			e.printStackTrace();
-		} catch (java.io.IOException e) {
-			e.printStackTrace();
 		}
 	}
 }
